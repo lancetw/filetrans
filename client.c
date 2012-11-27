@@ -53,6 +53,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in address;
     char server[UCHAR_MAX];
     int result;
+    char bytebuf[1];
     char buf[BUFF_LEN]; 
     char tmp[BUFF_LEN];
     char filename[BUFF_LEN];
@@ -132,7 +133,8 @@ int main(int argc, char *argv[]) {
                      "<<<<<", "<<<<<<", "<<<<<<<",
                      "<<<<<<<<", "<<<<<<<<<",
                      "<<<<<<<<<<", "<<<<<<<<<<<"};
-                    
+    
+    bzero(bytebuf, 1);           
     bzero(buf, BUFF_LEN);
     bzero(tmp, BUFF_LEN);
     
@@ -158,15 +160,15 @@ int main(int argc, char *argv[]) {
     
     for (i = 0, cread = 1, per = 0; i < nread; i++, cread++) { 
         cls();
-        st = fread(buf, sizeof (char*), 1, fp);
-        st = send(client_sockfd, buf, sizeof (char*), 0);
+        st = fread(bytebuf, sizeof (char*), 1, fp);
+        st = send(client_sockfd, bytebuf, sizeof (char*), 0);
         
         per = ((float) cread / (float) nread) * 100;
         j = i % dc;
         if (i == nread - 1) j = dc - 1;
 
         printf("\r進度：\t %3d %c %12s 正在上傳 \"%s\" %d / %d bytes\n", per, '%', dot[j], filename, cread, nread);
-        usleep(100);    /* 慢慢來 */
+        usleep(10000);    /* 慢慢來 */
         
     }
     

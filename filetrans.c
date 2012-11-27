@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
     int result;
     fd_set readfds, testfds;
     int fdmax;
+    char bytebuf[1];
     char buf[BUFF_LEN]; 
     char tmp[BUFF_LEN]; 
     char msg[BUFF_LEN];
@@ -124,19 +125,20 @@ int main(int argc, char *argv[]) {
         fd = 0;
         
         /* 使用 select() 模擬多人傳輸 */
-
+        usleep(5000);
         result = select(fdmax + 1, &testfds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
 
         if (result < 1) {
             perror("伺服器發生問題");
             exit(EXIT_FAILURE);
         }
-
+        
         /* 遍歷 fd_set */
         
         for (fd = 0; fd <= fdmax; fd++) {
             if (FD_ISSET(fd, &testfds)) {
   
+                bzero(bytebuf, 1);
                 bzero(buf, BUFF_LEN);
                 bzero(tmp, BUFF_LEN);
                 bzero(msg, BUFF_LEN);
@@ -162,6 +164,9 @@ int main(int argc, char *argv[]) {
                     /* 處理連入的客戶端 */
                     
                     ioctl(fd, FIONREAD, &nread);
+                    
+                    printf("nread: %d\n", nread);
+                    sleep(5);
 
                     if (nread == 0) {        /* 客戶端沒資料或是斷線 */
                         close(fd);
@@ -170,7 +175,7 @@ int main(int argc, char *argv[]) {
                         DEBUG("客戶端#%d離線\n", fd);
                         
                     } else {                /* 處理客戶端資料 */
-                    
+                        
                         /* 開始接收資料 */
                         
                         /* 接收檔案名稱與大小 */
@@ -189,30 +194,28 @@ int main(int argc, char *argv[]) {
 
                         for (i = 0, cread = 1, per = 0; i < nread; i++, cread++) {
                             cls(); 
-                            st = recv(fd, buf, 1, 0);
+                            st = recv(fd, bytebuf, 1, 0);
                             per = ((float) cread / (float) nread) * 100;
                             j = i % dc;
                             if (i == nread - 1) j = dc - 1;
                             
                             /* 處理取得的資料 */
-                            fwrite(buf, 1, sizeof (char), fp);
+                            fwrite(bytebuf, 1, sizeof (char), fp);
                             
                             printf("\r進度：\t %3d %c %12s 正在下載 \"%s\" %d / %d bytes\n", per, '%', dot[j], filename, cread, nread);
-                            usleep(100);    /* 慢慢來 */
+                            usleep(10000);    /* 慢慢來 */
                             
                         }
 
                         fclose(fp);
                         chdir("../");
-                        
+
                         usleep(100);
 
                         printf("傳輸完成\n");
                         
-                        fflush(stdin);
-                        fflush(stdout);
-                        
                         close(fd);
+                        FD_CLR(fd, &readfds);
                     }
                 }
             }
