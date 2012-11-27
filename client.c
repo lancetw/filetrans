@@ -43,30 +43,23 @@
 
 #define PORT 12345
 
-int stdin_ready(void);
+void cls(void);
+
 
 int main(int argc, char *argv[]) {
     
-    int client_sockfd, nread;
+    int client_sockfd;
     int len;
     struct sockaddr_in address;
     char server[UCHAR_MAX];
     int result;
     char buf[BUFF_LEN]; 
     char tmp[BUFF_LEN];
-    char msg[BUFF_LEN];
-    char nick[UCHAR_MAX];
+    char filename[BUFF_LEN];
     fd_set readfds;
-
+    int i, j;
 
     DEBUG("除錯模式啟動\n");
-
-    /* 要求使用者輸入暱稱 */
-    
-    do {
-        printf("請輸入暱稱：");
-        scanf("%s", nick);
-    } while ((char*)NULL == nick);
 
     /*  建立客戶端 socket  */
 
@@ -77,17 +70,38 @@ int main(int argc, char *argv[]) {
 
     /*  設定客戶端 socket  */
     
-    /* 使用者提供伺服器資訊 */
-    if (argc > 1) {
+    /* 使用者提供伺服器資訊與檔案名稱 */
+    
+    bzero(&filename, BUFF_LEN);
+    
+    if (argc > 2) {
         /* 使用參數模式 */
         strcpy(server, argv[1]);
         printf("正在連線到 %s:%d ...\n", server, PORT);
+        
+        if (argc >= 2) {
+            strcpy(filename, argv[2]);
+        } else {
+            printf("請提供檔案名稱！\n");
+            perror("argv[2] 呼叫失敗");
+            exit(EXIT_FAILURE);   
+        }
+        
     } else {
         /* 使用預設伺服器資訊 */
         strcpy(server, SERVER);
+        
+        if (argc > 1) {
+            strcpy(filename, argv[1]);
+        } else {
+            printf("請提供檔案名稱！\n");
+            perror("argv[1] 呼叫失敗");
+            exit(EXIT_FAILURE);   
+        }
+        
     }
 
-    memset(&address, 0x00, sizeof (struct sockaddr_in));
+    bzero(&address, sizeof (struct sockaddr_in));
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = inet_addr(SERVER);
     address.sin_port = htons(PORT);
@@ -95,7 +109,7 @@ int main(int argc, char *argv[]) {
 
     /* 與伺服器建立連線 */
 
-    if ((result = connect(client_sockfd, (struct sockaddr *)&address, len)) < 0) {
+    if ((result = connect(client_sockfd, (struct sockaddr *) &address, len)) < 0) {
         perror("connect() 呼叫失敗"); 
         close(client_sockfd);
         exit(EXIT_FAILURE);
@@ -105,45 +119,63 @@ int main(int argc, char *argv[]) {
     }
     
     FD_ZERO(&readfds);
-    FD_ZERO(&buf);
-    FD_ZERO(&tmp);
-    FD_ZERO(&msg);
     FD_SET(client_sockfd, &readfds);
     
     /* 開始傳送接收資料 */
 
-    printf("%s 歡迎加入聊天室\n", nick);
+    /* 開啟使用者指定的檔案 */
+    
+    FILE *fp;
+    int st, nread, cread, per, dc;
+    dc = 12;
+    char* dot[12] = {"", "<", "<<", "<<<", "<<<<", 
+                     "<<<<<", "<<<<<<", "<<<<<<<",
+                     "<<<<<<<<", "<<<<<<<<<",
+                     "<<<<<<<<<<", "<<<<<<<<<<<"};
+                    
+    bzero(buf, BUFF_LEN);
+    bzero(tmp, BUFF_LEN);
+    
+    fp = fopen(filename, "rb");
 
-    for(;;) {
-        /* 開始接收資料 */
+    /* 開始傳送接收資料 */
         
-        ioctl(client_sockfd, FIONREAD, &nread);
-        
-        if (stdin_ready()) {
-            fscanf(stdin, "\n%[^\n]", buf);
-            sprintf(msg, "%s: %s", nick, buf);
-            if (send(client_sockfd, msg, sizeof (msg), 0)) {
-                DEBUG("訊息已送出\n");
-            }
-        }
-
-        usleep(100);
-
-        if (!nread == 0) { /* 處理客戶端資料 */
-            
-            /* 開始接收資料 */
-            if (FD_ISSET(client_sockfd, &readfds)) {
-                if (recv(client_sockfd, buf, sizeof (buf), 0)) {
-                     DEBUG("訊息已接收\n");
-                }
-
-                usleep(100);
-
-                printf("%s\n", buf);
-            }
-        }
+    /* 取得檔案大小 */
+    
+    fseek(fp, 0L, SEEK_END);
+    nread = ftell(fp);
+    fseek(fp, 0L, SEEK_SET);
+    
+    /* 傳送檔案名稱與檔案大小給對方 */
+    
+    if (send(client_sockfd, filename, BUFF_LEN, 0)) {
+        DEBUG("Filename 訊息已送出\n");
     }
+    
+    if (send(client_sockfd, &nread, sizeof (int), 0)) {
+        DEBUG("Filesize 訊息已送出\n");
+    }
+    
+    for (i = 0, cread = 1, per = 0; i < nread; i++, cread++) { 
+        cls();
+        st = fread(buf, sizeof (char*), 1, fp);
+        st = send(client_sockfd, buf, sizeof (char*), 0);
+        
+        per = ((float) cread / (float) nread) * 100;
+        j = i % dc;
+        if (i == nread - 1) j = dc - 1;
 
+        printf("\r進度：\t %3d %c %12s 正在上傳 \"%s\" %d / %d bytes\n", per, '%', dot[j], filename, cread, nread);
+        usleep(100);    /* 慢慢來 */
+        
+    }
+    
+    fclose(fp);
+    
+    usleep(100);
+
+    printf("傳輸完成\n");
+    
     /* 關閉 socket */
     
     close(client_sockfd);
@@ -152,20 +184,10 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
+/* work on ANSI terminals, demands POSIX. */
 
-/* 以 select() 實作 non-blocking 的輸入 */
-int stdin_ready() {
-    fd_set fdset;
-    struct timeval timeout;
-    int fd;
-    
-    fd = fileno(stdin);
-    FD_ZERO(&fdset);
-    FD_SET(fd, &fdset);
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 1;
-    
-    usleep(5000);    /* avoid high CPU loading */
-    
-    return select(fd + 1, &fdset, NULL, NULL, &timeout) == 1 ? 1 : 0;
+void cls()
+{
+    const char* CLEAR_SCREE_ANSI = "\e[1;1H\e[2J";
+    write(STDOUT_FILENO, CLEAR_SCREE_ANSI, 12);
 }
