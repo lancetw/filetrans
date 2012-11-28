@@ -225,7 +225,7 @@ int main(int argc, char *argv[]) {
                             
                             cls(); 
                             printf("\r進度：%3d %c %8s 正在下載 \"%s\" %d / %d bytes\n", per, '%', dot[j], filename, cread, nread);
-                            usleep(5000);    /* 避免 CPU 佔用過高 */
+                            usleep(250);    /* 避免 CPU 佔用過高與畫面閃爍 */
    
                         }
 
@@ -237,7 +237,11 @@ int main(int argc, char *argv[]) {
                         close(fd);
                         FD_CLR(fd, &readfds);
 
-                        printf("傳輸完成\n");
+                        if (cread == nread) {
+                            printf("傳輸完成\n");
+                        } else {
+                            printf("傳輸失敗，客戶端關閉連線。\n");
+                        }
                         
                     }
                 }

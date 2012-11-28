@@ -180,9 +180,10 @@ int main(int argc, char *argv[]) {
         
         bzero(bytebuf, sizeof (wchar_t*));
         
-        if (!feof(fp))
-            fread(bytebuf, 1, 1, fp);
-          
+        if (!feof(fp)) {
+            st = fread(bytebuf, 1, 1, fp);
+        }
+               
         st = send(client_sockfd, bytebuf, 1, 0);
         
         per = ((float) cread / (float) nread) * 100;
@@ -193,7 +194,7 @@ int main(int argc, char *argv[]) {
         
         cls();
         printf("\r進度：%3d %c %8s 正在上傳 \"%s\" %d / %d bytes\n", per, '%', dot[j], filename, cread, nread);
-        usleep(5000);    /* 避免 CPU 佔用過高 */
+        usleep(250);    /* 避免 CPU 佔用過高與畫面閃爍 */
 
     }
     
