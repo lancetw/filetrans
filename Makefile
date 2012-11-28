@@ -1,21 +1,14 @@
 CC=gcc
-CFLAGS=-O2 -Wall
+CFLAGS=-O2 -Wall -C99
 
-all: filetrans client
+filetrans: filetrans.c client.c server.c
+	${CC} -o filetrans ${CFLAGS} filetrans.c client.c server.c        
 
-filetrans: filetrans.c
-	${CC} -o filetrans ${CFLAGS} filetrans.c          
-client: client.c
-	${CC} -o client ${CFLAGS} client.c
+debug: filetrans_debug
 
-debug: filetrans_debug client_debug
-
-filetrans_debug: filetrans.c
-	${CC} -o filetrans_d -D_DEBUG -g ${CFLAGS} filetrans.c
-
-client_debug: client.c
-	${CC} -o client_d -D_DEBUG -g ${CFLAGS} client.c
+filetrans_debug: filetrans.c client.c server.c
+	${CC} -o filetrans_d -D_DEBUG -g ${CFLAGS} filetrans.c client.c server.c
 
 clean:
-	rm -rf filetrans client filetrans_d client_d
+	rm -rf filetrans filetrans_d
 

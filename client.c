@@ -18,51 +18,11 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */       
 
-#include "global.h"
-
-#include <stdio.h>
-#include <netinet/in.h>
-#include <sys/time.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <limits.h>
-#include <netdb.h>
-#include <errno.h>
-#include <wchar.h>
-
-/* 預設緩衝區長度為 1024 bytes */
-
-#define BUFF_LEN 1024
-
-/* 預設伺服器位址 */
-#define SERVER "127.0.0.1"
-
-/* 預設開放端口*/
-
-#define PORT 12345
-
-void cls(void);
-
-void split_path_file(char**, char**, char*);
+#include "client.h"
 
 
-int main(int argc, char *argv[]) {
+int client_mode(char* server, char* filename) {
     
-    int client_sockfd;
-    int len;
-    struct sockaddr_in address;
-    char server[UCHAR_MAX];
-    int result;
-    wchar_t bytebuf[1];
-    wchar_t buf[BUFF_LEN]; 
-    wchar_t tmp[BUFF_LEN];
-    char filename[BUFF_LEN];
-    fd_set readfds;
-    int i, j;
-
     DEBUG("除錯模式啟動\n");
 
     /*  建立客戶端 socket  */
@@ -73,47 +33,16 @@ int main(int argc, char *argv[]) {
     }
 
     /*  設定客戶端 socket  */
-    
-    /* 使用者提供伺服器資訊與檔案名稱 */
-    
-    bzero(&filename, BUFF_LEN);
-    
-    if (argc > 2) {
-        /* 使用參數模式 */
-        strcpy(server, argv[1]);
-        printf("正在連線到 %s:%d ...\n", server, PORT);
-        
-        if (argc >= 2) {
-            strcpy(filename, argv[2]);
-        } else {
-            printf("請提供檔案名稱！\n");
-            perror("argv[2] 呼叫失敗");
-            exit(EXIT_FAILURE);   
-        }
-        
-    } else {
-        /* 使用預設伺服器資訊 */
-        strcpy(server, SERVER);
-        
-        if (argc > 1) {
-            strcpy(filename, argv[1]);
-        } else {
-            printf("請提供檔案名稱！\n");
-            perror("argv[1] 呼叫失敗");
-            exit(EXIT_FAILURE);   
-        }
-        
-    }
 
-    bzero(&address, sizeof (struct sockaddr_in));
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr(SERVER);
-    address.sin_port = htons(PORT);
-    len = sizeof (address);
+    bzero(&server_address, sizeof (struct sockaddr_in));
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = inet_addr(server);
+    server_address.sin_port = htons(PORT);
+    len = sizeof (server_address);
 
     /* 與伺服器建立連線 */
 
-    if ((result = connect(client_sockfd, (struct sockaddr *) &address, len)) < 0) {
+    if ((result = connect(client_sockfd, (struct sockaddr *) &server_address, len)) < 0) {
         perror("connect() 呼叫失敗"); 
         close(client_sockfd);
         exit(EXIT_FAILURE);
@@ -128,14 +57,6 @@ int main(int argc, char *argv[]) {
     /* 開始傳送接收資料 */
 
     /* 開啟使用者指定的檔案 */
-    
-    FILE *fp;
-    int st, nread, cread, per, dc;
-    dc = 12;
-    char* dot[12] = {"", "<", "<", "<", "<<<<", 
-                     "<<<<", "<<<<", "<<<<<",
-                     "<<<<<<<<", "<<<<<<<<",
-                     "<<<<<<<<", "<<<<<<<<"};
     
     bzero(bytebuf, 1);           
     bzero(buf, BUFF_LEN);
@@ -187,9 +108,9 @@ int main(int argc, char *argv[]) {
         st = send(client_sockfd, bytebuf, 1, 0);
         
         per = ((float) cread / (float) nread) * 100;
-        j = i % dc;
+        j = i % DOT_LEN;
         if (i == nread - 1) {
-            j = dc - 1;
+            j = DOT_LEN - 1;
         }
         
         cls();
@@ -212,19 +133,4 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-/* work on ANSI terminals, demands POSIX. */
 
-void cls()
-{
-    const char* CLEAR_SCREE_ANSI = "\e[1;1H\e[2J";
-    write(STDOUT_FILENO, CLEAR_SCREE_ANSI, 12);
-}
-
-
-void split_path_file(char** p, char** f, char* pf) {
-    char *slash = pf, *next;
-    while ((next = strpbrk(slash + 1, "\\/"))) slash = next;
-    if (pf != slash) slash++;
-    *p = strndup(pf, slash - pf);
-    *f = strdup(slash);
-}
