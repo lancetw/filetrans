@@ -14,7 +14,7 @@ DEBUG mode:
 
     $ make debug
     
-Use (Server side):
+Use (server side):
 
     $ ./filetrans
     
