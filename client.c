@@ -31,6 +31,7 @@
 #include <limits.h>
 #include <netdb.h>
 #include <errno.h>
+#include <wchar.h>
 
 /* 預設緩衝區長度為 1024 bytes */
 
@@ -45,6 +46,8 @@
 
 void cls(void);
 
+void split_path_file(char**, char**, char*);
+
 
 int main(int argc, char *argv[]) {
     
@@ -53,9 +56,9 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in address;
     char server[UCHAR_MAX];
     int result;
-    char bytebuf[1];
-    char buf[BUFF_LEN]; 
-    char tmp[BUFF_LEN];
+    wchar_t bytebuf[1];
+    wchar_t buf[BUFF_LEN]; 
+    wchar_t tmp[BUFF_LEN];
     char filename[BUFF_LEN];
     fd_set readfds;
     int i, j;
@@ -64,7 +67,7 @@ int main(int argc, char *argv[]) {
 
     /*  建立客戶端 socket  */
 
-    if ((client_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+    if ((client_sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
         perror("socket() 呼叫失敗");
         exit(EXIT_FAILURE);
     }
@@ -129,24 +132,39 @@ int main(int argc, char *argv[]) {
     FILE *fp;
     int st, nread, cread, per, dc;
     dc = 12;
-    char* dot[12] = {"", "<", "<<", "<<<", "<<<<", 
-                     "<<<<<", "<<<<<<", "<<<<<<<",
-                     "<<<<<<<<", "<<<<<<<<<",
-                     "<<<<<<<<<<", "<<<<<<<<<<<"};
+    char* dot[12] = {"", "<", "<", "<", "<<<<", 
+                     "<<<<", "<<<<", "<<<<<",
+                     "<<<<<<<<", "<<<<<<<<",
+                     "<<<<<<<<", "<<<<<<<<"};
     
     bzero(bytebuf, 1);           
     bzero(buf, BUFF_LEN);
     bzero(tmp, BUFF_LEN);
     
-    fp = fopen(filename, "rb");
+    /* 處理檔案路徑 */
+    /* malloc two buffs */
+    char* _path = malloc(BUFF_LEN);
+    char*_fname = malloc(BUFF_LEN);
+    
+    split_path_file(&_path, &_fname, filename);
+    strcpy(filename, _fname);
+    chdir(_path);
+    
+    DEBUG("File name: %s\n", filename);
+    
+    fp = fopen(filename, "rb, ccs=UTF-8");
 
-    /* 開始傳送接收資料 */
-        
+    /* 開始傳送資料 */
+    
+    /*ioctl(client_sockfd, FIONREAD, &nread);*/
+    
     /* 取得檔案大小 */
     
     fseek(fp, 0L, SEEK_END);
     nread = ftell(fp);
     fseek(fp, 0L, SEEK_SET);
+    
+    DEBUG("File size: %d\n", nread);
     
     /* 傳送檔案名稱與檔案大小給對方 */
     
@@ -157,26 +175,33 @@ int main(int argc, char *argv[]) {
     if (send(client_sockfd, &nread, sizeof (int), 0)) {
         DEBUG("Filesize 訊息已送出\n");
     }
-    
-    for (i = 0, cread = 1, per = 0; i < nread; i++, cread++) { 
-        cls();
-        st = fread(bytebuf, sizeof (char*), 1, fp);
-        st = send(client_sockfd, bytebuf, sizeof (char*), 0);
+
+    for (i = 0, cread = 1, per = 0; i < nread; i = i + 1, cread = cread + 1) { 
+        
+        bzero(bytebuf, sizeof (wchar_t*));
+        
+        if (!feof(fp))
+            fread(bytebuf, 1, 1, fp);
+          
+        st = send(client_sockfd, bytebuf, 1, 0);
         
         per = ((float) cread / (float) nread) * 100;
         j = i % dc;
-        if (i == nread - 1) j = dc - 1;
-
-        printf("\r進度：\t %3d %c %12s 正在上傳 \"%s\" %d / %d bytes\n", per, '%', dot[j], filename, cread, nread);
-        usleep(10000);    /* 慢慢來 */
+        if (i == nread - 1) {
+            j = dc - 1;
+        }
         
+        cls();
+        printf("\r進度：%3d %c %8s 正在上傳 \"%s\" %d / %d bytes\n", per, '%', dot[j], filename, cread, nread);
+        usleep(5000);    /* 避免 CPU 佔用過高 */
+
     }
     
     fclose(fp);
     
-    usleep(100);
-
     printf("傳輸完成\n");
+    
+    chdir("..");
     
     /* 關閉 socket */
     
@@ -192,4 +217,13 @@ void cls()
 {
     const char* CLEAR_SCREE_ANSI = "\e[1;1H\e[2J";
     write(STDOUT_FILENO, CLEAR_SCREE_ANSI, 12);
+}
+
+
+void split_path_file(char** p, char** f, char* pf) {
+    char *slash = pf, *next;
+    while ((next = strpbrk(slash + 1, "\\/"))) slash = next;
+    if (pf != slash) slash++;
+    *p = strndup(pf, slash - pf);
+    *f = strdup(slash);
 }

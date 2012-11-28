@@ -28,7 +28,9 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <limits.h>
 #include <math.h>
+#include <wchar.h>
 
 /* 預設緩衝區長度為 1024 bytes */
 
@@ -39,6 +41,8 @@
 #define PORT 12345
 
 void cls(); 
+
+void split_path_file(char**, char**, char*);
 
 
 /* 預設監聽接收檔案 (Server mode)，引數指定檔案傳送 (Client mode) */
@@ -52,25 +56,25 @@ int main(int argc, char *argv[]) {
     int result;
     fd_set readfds, testfds;
     int fdmax;
-    char bytebuf[1];
-    char buf[BUFF_LEN]; 
-    char tmp[BUFF_LEN]; 
-    char msg[BUFF_LEN];
+    wchar_t bytebuf[1];
+    wchar_t buf[BUFF_LEN]; 
+    wchar_t tmp[BUFF_LEN]; 
+    wchar_t msg[BUFF_LEN];
     char filename[BUFF_LEN];
     int i, j;
     int fd;
     FILE *fp;
     int st, nread, cread, per, dc;
     dc = 12;
-    char* dot[12] = {"", "<", "<<", "<<<", "<<<<", 
-                     "<<<<<", "<<<<<<", "<<<<<<<",
-                     "<<<<<<<<", "<<<<<<<<<",
-                     "<<<<<<<<<<", "<<<<<<<<<<<"};
+    char* dot[12] = {"", "<", "<", "<", "<<<<", 
+                     "<<<<", "<<<<", "<<<<<",
+                     "<<<<<<<<", "<<<<<<<<",
+                     "<<<<<<<<", "<<<<<<<<"};
                     
 
     /*  建立伺服器 socket  */
 
-    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+    if ((server_sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
         perror("socket() 呼叫失敗");
         exit(EXIT_FAILURE);
     }
@@ -121,11 +125,12 @@ int main(int argc, char *argv[]) {
     for (;;) {
                
         /* 複製編號 */
+        
         testfds = readfds;
         fd = 0;
         
         /* 使用 select() 模擬多人傳輸 */
-        usleep(5000);
+        
         result = select(fdmax + 1, &testfds, (fd_set *) 0, (fd_set *) 0, (struct timeval *) 0);
 
         if (result < 1) {
@@ -161,12 +166,9 @@ int main(int argc, char *argv[]) {
                     
                 } else {
           
-                    /* 處理連入的客戶端 */
+                    /* 開始接收資料 */
                     
                     ioctl(fd, FIONREAD, &nread);
-                    
-                    printf("nread: %d\n", nread);
-                    sleep(5);
 
                     if (nread == 0) {        /* 客戶端沒資料或是斷線 */
                         close(fd);
@@ -176,46 +178,67 @@ int main(int argc, char *argv[]) {
                         
                     } else {                /* 處理客戶端資料 */
                         
-                        /* 開始接收資料 */
-                        
                         /* 接收檔案名稱與大小 */
 
                         st = recv(fd, filename, BUFF_LEN, 0);
-                        st = recv(fd, &nread, sizeof (int), 0);
+                        if (!st) break;
                         
-                        DEBUG("Filename: %s, size: %d\n", filename, nread);
+                        DEBUG("File name: %s\n", filename);
+                        
+                        st = recv(fd, &nread, sizeof (int), 0);
+                        if (!st) break;
+                        
+                        DEBUG("File size: %d\n", nread);
                         
                         /* 存成檔案 */
                         
+                        /* 處理檔案路徑 */
+                        /* malloc two buffs */
+                        char* _path = malloc(BUFF_LEN);
+                        char*_fname = malloc(BUFF_LEN);
+                        
+                        split_path_file(&_path, &_fname, filename);
+                        strcpy(filename, _fname);
+                        
                         chdir("./downloads");
-                        fp = fopen(filename, "wb");
+                        
+                        fp = fopen(filename, "wb, ccs=UTF-8");
                         
                         /* 顯示進度 */
 
-                        for (i = 0, cread = 1, per = 0; i < nread; i++, cread++) {
-                            cls(); 
+                        for (i = 0, cread = 1, per = 0; i < nread; i = i + 1, cread = cread + 1) {
+                            
+                            bzero(bytebuf, sizeof (wchar_t*));
+                            
                             st = recv(fd, bytebuf, 1, 0);
+                            if (st <= 0) break;
+                            
                             per = ((float) cread / (float) nread) * 100;
                             j = i % dc;
-                            if (i == nread - 1) j = dc - 1;
+                            if (i == nread - 1) {
+                                j = dc - 1;
+                            }
                             
                             /* 處理取得的資料 */
-                            fwrite(bytebuf, 1, sizeof (char), fp);
                             
-                            printf("\r進度：\t %3d %c %12s 正在下載 \"%s\" %d / %d bytes\n", per, '%', dot[j], filename, cread, nread);
-                            usleep(10000);    /* 慢慢來 */
+                            fwrite(bytebuf, 1, 1, fp);
                             
+                            cls(); 
+                            printf("\r進度：%3d %c %8s 正在下載 \"%s\" %d / %d bytes\n", per, '%', dot[j], filename, cread, nread);
+                            usleep(5000);    /* 避免 CPU 佔用過高 */
+   
                         }
 
+                        /* 關閉相關資源 */
+                        
                         fclose(fp);
                         chdir("../");
 
-                        usleep(100);
+                        close(fd);
+                        FD_CLR(fd, &readfds);
 
                         printf("傳輸完成\n");
                         
-                        close(fd);
-                        FD_CLR(fd, &readfds);
                     }
                 }
             }
@@ -237,4 +260,13 @@ void cls()
 {
     const char* CLEAR_SCREE_ANSI = "\e[1;1H\e[2J";
     write(STDOUT_FILENO, CLEAR_SCREE_ANSI, 12);
+}
+
+
+void split_path_file(char** p, char** f, char* pf) {
+    char *slash = pf, *next;
+    while ((next = strpbrk(slash + 1, "\\/"))) slash = next;
+    if (pf != slash) slash++;
+    *p = strndup(pf, slash - pf);
+    *f = strdup(slash);
 }
