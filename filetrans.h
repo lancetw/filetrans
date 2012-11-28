@@ -45,7 +45,7 @@
 
 /* 預設開放端口*/
 
-#define PORT 12345
+#define PORT 54321
 
 #define DOT_LEN 12
 
