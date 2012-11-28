@@ -1,5 +1,5 @@
 /**
- * filetrans.c : 簡易檔案傳輸工具程式
+ * server.c : 簡易檔案傳輸工具程式
  *
  * Copyright (c) 2012 鄭新霖 aka Hsin-lin Cheng <lancetw@gmail.com>
  *
