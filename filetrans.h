@@ -77,8 +77,5 @@ void cls();
 
 void split_path_file(char**, char**, char*);
 
-void timestamp(char*);
-
-
 
 #endif /* FILETRANS_H */
