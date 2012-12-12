@@ -20,7 +20,7 @@ Use (server side):
     
 Use (client side):
 
-    $ ./filetrans 127.0.0.1 upload/sample.txt
+    $ ./filetrans 127.0.0.1 uploads/sample.txt
     
 Screenshot:
 
