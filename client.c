@@ -77,8 +77,6 @@ int client_mode(char* server, char* filename) {
 
     /* 開始傳送資料 */
     
-    /*ioctl(client_sockfd, FIONREAD, &nread);*/
-    
     /* 取得檔案大小 */
     
     fseek(fp, 0L, SEEK_END);

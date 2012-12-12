@@ -113,7 +113,7 @@ int server_mode() {
                     if (client_sockfd > fdmax) { 
                         fdmax = client_sockfd;
                     }
-                    DEBUG("%s: 新連線 %s 於 socket#%d\n", argv[0], inet_ntoa(client_address.sin_addr), client_sockfd);
+                    DEBUG("新連線 %s 於 socket#%d\n", inet_ntoa(client_address.sin_addr), client_sockfd);
                     
                 } else {
           
@@ -183,7 +183,7 @@ int server_mode() {
                         /* 關閉相關資源 */
                         
                         fclose(fp);
-                        chdir("../");
+                        chdir("..");
 
                         close(fd);
                         FD_CLR(fd, &readfds);
