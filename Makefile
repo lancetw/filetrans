@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O2 -Wall -C99
+CFLAGS=-O2 -Wall
 
 filetrans: filetrans.c client.c server.c
 	${CC} -o filetrans ${CFLAGS} filetrans.c client.c server.c        
